@@ -17,16 +17,16 @@ func main() {
     - hasty: if true maintains a higher RPS good for work() that takes long, false forces rate below the limit.
     - verbose: enable logging
     */
-    rlc := ratelimitedworker.Create("sampleId", targetRPM, true, true)
+    rlw := ratelimitedworker.Create("sampleId", targetRPM, true, true)
     go queueLoader(queue)
-    doLotsOfWork(rlc,queue)
+    doLotsOfWork(rlw,queue)
 }
 
-func doLotsOfWork(rlc *ratelimitedworker.RLCtr, queue chan (string)) {
+func doLotsOfWork(rlw *ratelimitedworker.RLW, queue chan (string)) {
 
 	for range queue {
-		// this will allow the work() to be called only rlc.targetRPM number of times during a minute
-		rlc.Track() // if limit is hit for the time period it will block the below go routine
+		// this will allow the work() to be called only rlw.targetRPM number of times during a minute
+		rlw.Track() // if limit is hit for the time period it will block the below go routine
 		go work()
 	}
 }

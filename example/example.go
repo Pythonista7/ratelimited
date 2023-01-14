@@ -45,21 +45,21 @@ func producer(wg *sync.WaitGroup, queue chan (string)) {
 }
 
 func consumer(wg *sync.WaitGroup, queue chan (string)) {
-	const targetRPM int = 100
+	const targetRPM int = 1000
 
-	rlc := ratelimitedworker.Create("sampleId", targetRPM, true, true)
+	rlw := ratelimitedworker.Create("sampleId", targetRPM, true, true)
 
 	go func() {
 		defer wg.Done()
-		makeReqs(&rlc, queue)
+		makeReqs(&rlw, queue)
 	}()
 }
 
-func makeReqs(rlc *ratelimitedworker.RLCtr, queue chan (string)) {
+func makeReqs(rlw *ratelimitedworker.RLW, queue chan (string)) {
 
 	for range queue {
-		// this will allow the work() to be called rlc.targetRPM number of times only
-		rlc.Track() // if limit is hit for the time period it will block this go routine
+		// this will allow the work() to be called rlw.targetRPM number of times only
+		rlw.Track() // if limit is hit for the time period it will block this go routine
 		go work()
 	}
 }

@@ -10,7 +10,7 @@ import (
 	"go.uber.org/ratelimit"
 )
 
-type RLCtr struct {
+type RLW struct {
 	ID        string
 	RL        ratelimit.Limiter
 	TargetRPM uint32
@@ -19,7 +19,7 @@ type RLCtr struct {
 	verbose   bool        // enables logging
 	logger    *log.Logger // pkg logger instance
 	targetRPS int         // internally computed from TargetRPM and `hasty` param in Create()
-	active    bool        // bool to flag if the rlc has started
+	active    bool        // bool to flag if the rlw has started
 	// TODO: maybe have a channel which can send the message to stop proccessing
 	// TODO: work on cleanup
 }
@@ -40,7 +40,7 @@ func Create(
 	targetRPM int,
 	hasty bool,
 	verbose bool,
-) RLCtr {
+) RLW {
 
 	var targetRPS int
 	var logger *log.Logger
@@ -60,7 +60,7 @@ func Create(
 		logger = nil
 	}
 
-	return RLCtr{
+	return RLW{
 		ID:        id,
 		RL:        ratelimit.New(targetRPS), // param is rps
 		TargetRPM: uint32(targetRPM),
@@ -71,59 +71,59 @@ func Create(
 	}
 }
 
-func (rlc *RLCtr) Track() {
-	if !rlc.active {
+func (rlw *RLW) Track() {
+	if !rlw.active {
 		// init
-		rlc.start()
-		if rlc.verbose {
-			rlc.logger.Println("Init Success")
+		rlw.start()
+		if rlw.verbose {
+			rlw.logger.Println("Init Success")
 		}
 	}
 
 	// in case we hit the per min rate limit too soon , we wait around until we can resume
-	for rlc.history >= rlc.TargetRPM {
-		if rlc.verbose {
-			rlc.logger.Printf(
+	for rlw.history >= rlw.TargetRPM {
+		if rlw.verbose {
+			rlw.logger.Printf(
 				"Reached RPM waiting for history refresh: {history : %d , allowedRPM: %d }\n",
-				rlc.history, rlc.TargetRPM,
+				rlw.history, rlw.TargetRPM,
 			)
 		}
 
 		time.Sleep(1 * time.Second)
 	}
 
-	rlc.RL.Take()
-	atomic.AddUint32(&rlc.history, 1)
+	rlw.RL.Take()
+	atomic.AddUint32(&rlw.history, 1)
 
 }
 
-func (rlc *RLCtr) start() {
-	rlc.active = true
+func (rlw *RLW) start() {
+	rlw.active = true
 	window := 5
 
 	// optional logger ticker just for understanding
 	go func() {
 		ticker := time.NewTicker(time.Duration(window) * time.Second)
-		prev := rlc.history
+		prev := rlw.history
 		for range ticker.C {
 
 			var counter uint32
-			if rlc.history > prev {
-				counter = rlc.history - prev
+			if rlw.history > prev {
+				counter = rlw.history - prev
 			} else {
 				// when Hasty and rate limit is hit for the minute is hit before 60s ,
 				// we need to reset this because we're using uint
 				counter = 0
 			}
 
-			if rlc.verbose {
-				rlc.logger.Printf(
+			if rlw.verbose {
+				rlw.logger.Printf(
 					"Completed %d tasks in the last window(%d seconds) , targetRPS = %d , currentRPS = %d , completedTaskCountThisMinute = %d \n",
-					counter, window, rlc.targetRPS, counter/uint32(window), rlc.history)
+					counter, window, rlw.targetRPS, counter/uint32(window), rlw.history)
 			}
 
 			// update prev to track window counter
-			prev = rlc.history
+			prev = rlw.history
 
 		}
 	}()
@@ -132,15 +132,15 @@ func (rlc *RLCtr) start() {
 	go func() {
 		monitor := time.NewTicker(1 * time.Minute)
 		for range monitor.C {
-			if rlc.verbose {
-				rlc.logger.Printf(
+			if rlw.verbose {
+				rlw.logger.Printf(
 					"Period Stats(last 1 minute): noOfReqSent = %d , rateLimit(per min) = %d \n",
-					rlc.history, rlc.TargetRPM,
+					rlw.history, rlw.TargetRPM,
 				)
 			}
 
 			// reset history every minute
-			atomic.StoreUint32(&rlc.history, 0)
+			atomic.StoreUint32(&rlw.history, 0)
 
 		}
 	}()
