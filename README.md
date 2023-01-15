@@ -19,14 +19,14 @@ func main() {
     */
     rlw := ratelimitedworker.Create("sampleId", targetRPM, true, true)
     go queueLoader(queue)
-    doLotsOfWork(rlw,queue)
+    go doLotsOfWork(rlw,queue)
 }
 
 func doLotsOfWork(rlw *ratelimitedworker.RLW, queue chan (string)) {
 
 	for range queue {
 		// this will allow the work() to be called only rlw.targetRPM number of times during a minute
-		rlw.Track() // if limit is hit for the time period it will block the below go routine
+		rlw.Track() // if limit is hit for the time period it will block this go routine
 		go work()
 	}
 }
